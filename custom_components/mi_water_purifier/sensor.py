@@ -11,6 +11,7 @@ from datetime import timedelta
 SCAN_INTERVAL = timedelta(seconds=5)
 _LOGGER = logging.getLogger(__name__)
 
+RUN_STATUS = {'name': 'Run status', 'key': 'run_status'}
 TAP_WATER_QUALITY = {'name': 'Tap water', 'key': 'ttds'}
 FILTERED_WATER_QUALITY = {'name': 'Filtered water', 'key': 'ftds'}
 PP_COTTON_FILTER_REMAINING = {'name': 'PP cotton filter', 'key': 'pfd', 'days_key': 'pfp'}
@@ -34,6 +35,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         device = Device(host, token)
         waterPurifier = XiaomiWaterPurifier(device, name, unique_id)
         devices.append(waterPurifier)
+        devices.append(XiaomiWaterPurifierSensor(waterPurifier, RUN_STATUS))
         devices.append(XiaomiWaterPurifierSensor(waterPurifier, TAP_WATER_QUALITY, unique_id))
         devices.append(XiaomiWaterPurifierSensor(waterPurifier, FILTERED_WATER_QUALITY, unique_id))
         devices.append(XiaomiWaterPurifierSensor(waterPurifier, PP_COTTON_FILTER_REMAINING, unique_id))
@@ -70,6 +72,9 @@ class XiaomiWaterPurifierSensor(Entity):
         if self._data_key['key'] is TAP_WATER_QUALITY['key'] or \
                 self._data_key['key'] is FILTERED_WATER_QUALITY['key']:
             return 'mdi:water'
+        if self._data_key['key'] is RINSE['key'] or \
+           self._data_key['key'] is RUN_STATUS['key']:
+            return 'mdi:replay'   
         else:
             return 'mdi:filter-outline'
 
@@ -84,6 +89,9 @@ class XiaomiWaterPurifierSensor(Entity):
         if self._data_key['key'] is TAP_WATER_QUALITY['key'] or \
                 self._data_key['key'] is FILTERED_WATER_QUALITY['key']:
             return 'TDS'
+        if self._data_key['key'] is RINSE['key'] or \
+           self._data_key['key'] is RUN_STATUS['key']:
+            return ''
         return '%'
 
     @property
@@ -149,6 +157,7 @@ class XiaomiWaterPurifier(Entity):
     def device_state_attributes(self):
         """Return the state attributes of the last update."""
         attrs = {}
+        attrs[RUN_STATUS['name']] = '{}'.format(self._data[RUN_STATUS['key']])
         attrs[TAP_WATER_QUALITY['name']] = '{}TDS'.format(self._data[TAP_WATER_QUALITY['key']])
         attrs[PP_COTTON_FILTER_REMAINING['name']] = '{}%'.format(self._data[PP_COTTON_FILTER_REMAINING['key']])
         attrs[FRONT_ACTIVE_CARBON_FILTER_REMAINING['name']] = '{}%'.format(
@@ -164,6 +173,7 @@ class XiaomiWaterPurifier(Entity):
         try:
             data = {}
             status = self._device.send('get_prop', [])
+            data[RUN_STATUS['key']] = status[0]
             data[TAP_WATER_QUALITY['key']] = status[0]
             data[FILTERED_WATER_QUALITY['key']] = status[1]
             pfd = int((status[11] - status[3]) / 24)
